@@ -20,7 +20,7 @@ class USERS:
             unigroup           TEXT NOT NULL
         )""")
 
-    def addUser(self, userid: int):
+    def addUser(self, userid: int) -> None:
         self.sql.execute('INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?)',
                          (userid, *DEFAULT))
         self.db.commit()
@@ -35,7 +35,7 @@ class USERS:
             return DEFAULT
         return user[0][1:]
 
-    def editUser(self, userid: int, i: int, value):
+    def editUser(self, userid: int, i: int, value) -> None:
         self.sql.execute(f"UPDATE users SET {COLUMNS[i]} = ? WHERE userid = ?",
                          (value, userid))
         self.db.commit()
