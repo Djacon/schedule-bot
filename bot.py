@@ -2,6 +2,7 @@ import json
 import requests
 from re import match
 from math import ceil
+from os import environ
 from telebot import TeleBot
 from datetime import date as DATE, timedelta
 from telegram_bot_pagination import InlineKeyboardPaginator
@@ -20,11 +21,9 @@ COUNT_OF_ITEMS = 4
 
 TEMP = {}
 
-with open('Token.txt', 'r') as f:
-    bot = TeleBot(f.read())
+KEY = environ['KEY']
 
-with open('KEY.txt', 'r') as f:
-    KEY = f.read()
+bot = TeleBot(environ['TOKEN'])
 
 
 def toValidTime(x):
@@ -113,7 +112,7 @@ def getMarkup():
 
 
 def sendErr(message):
-    bot.send_message(message.chat.id, 'Неправильный ввод!',
+    bot.send_message(message.chat.id, 'Некорректный ввод!',
                      reply_markup=getMarkup())
 
 
@@ -251,4 +250,6 @@ def getSchedule(message, startTime, endTime, date):
     bot.send_message(message.chat.id, schedule, reply_markup=paginator.markup)
 
 
-bot.infinity_polling()
+if __name__ == '__main__':
+    print('Бот запущен!')
+    bot.infinity_polling()
