@@ -112,6 +112,11 @@ def getMarkup():
     return markup
 
 
+def sendErr(message):
+    bot.send_message(message.chat.id, 'Неправильный ввод!',
+                     reply_markup=getMarkup())
+
+
 @bot.message_handler(commands=['start'])
 def start(message):
     greet = 'Привет юзер!\nЗдесь ты можешь легко работать с расписанием ' +\
@@ -128,9 +133,8 @@ def scheduleF_page_callback(call):
     date = data[3]
     schedule, size = getScheduleForth(FABRICHNAYA, VYKHINO, time, date, page)
     paginator = InlineKeyboardPaginator(size, current_page=page,
-                                        data_pattern="scheduleF#{page}#" +
+                                        data_pattern="scheduleF#{page}#"
                                         f'{time}#{date}')
-
     bot.edit_message_text(
         schedule,
         call.message.chat.id,
@@ -147,9 +151,8 @@ def scheduleB_page_callback(call):
     date = data[3]
     schedule, size = getScheduleBack(FABRICHNAYA, VYKHINO, time, date, page)
     paginator = InlineKeyboardPaginator(size, current_page=page,
-                                        data_pattern="scheduleB#{page}#" +
+                                        data_pattern="scheduleB#{page}#"
                                         f'{time}#{date}')
-
     bot.edit_message_text(
         schedule,
         call.message.chat.id,
@@ -164,22 +167,25 @@ def message_reply(message):
         bot.send_message(message.chat.id, 'Здесь ничего нет (пока что)')
 
     elif message.text == 'Получить расписание':
+        markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=6)
+        markup.add(*[KeyboardButton(str(i)) for i in range(1, 7)])
+
         bot.send_message(message.chat.id, 'Укажите время или номер начала '
                          '<u>первой пары</u>:\n(Время пишется в виде: XX:XX, '
-                         'номер пары: число 1-6)', parse_mode='HTML')
+                         'номер пары: число 1-6)', parse_mode='HTML',
+                         reply_markup=markup)
         bot.register_next_step_handler(message, firstPair)
     else:
         bot.send_message(message.chat.id, 'Команда не распознана')
 
 
 def firstPair(message):
-    if message.text.isdigit() and 0 < int(message.text) < 7:
+    if match(r'^[1-6]$', message.text):
         startTime = startIdxToMinutes(message.text)
     elif match(r'^(0?\d|1\d|2[0-3]):([0-5]\d)$', message.text):
         startTime = toMinutes(message.text.split(':'))
     else:
-        bot.send_message(message.chat.id, 'Неправильный ввод!')
-        return
+        return sendErr(message)
 
     bot.send_message(message.chat.id, 'Укажите время или номер конца <u>'
                      'последней пары</u>:\n(Время пишется в виде: XX:XX, '
@@ -188,13 +194,12 @@ def firstPair(message):
 
 
 def lastPair(message, startTime):
-    if message.text.isdigit() and 0 < int(message.text) < 7:
+    if match(r'^[1-6]$', message.text):
         endTime = endIdxToMinutes(message.text)
     elif match(r'^(0?\d|1\d|2[0-3]):([0-5]\d)$', message.text):
         endTime = toMinutes(message.text.split(':'))
     else:
-        bot.send_message(message.chat.id, 'Неправильный ввод!')
-        return
+        return sendErr(message)
 
     markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     today = KeyboardButton('Сегодня')
@@ -207,7 +212,7 @@ def lastPair(message, startTime):
 
 
 def scheduleDay(message, startTime, endTime):
-    if str(DATE.today()) == 'Сегодня':
+    if message.text == 'Сегодня':
         date = str(DATE.today())
     elif message.text == 'Завтра':
         date = str(DATE.today() + timedelta(days=1))
@@ -217,9 +222,7 @@ def scheduleDay(message, startTime, endTime):
         bot.register_next_step_handler(message, otherDay, startTime, endTime)
         return
     else:
-        bot.send_message(message.chat.id, 'Неправильный ввод!',
-                         reply_markup=getMarkup())
-        return
+        return sendErr(message)
 
     getSchedule(message, startTime, endTime, date)
 
