@@ -257,7 +257,6 @@ def getUniSchedule(message, date, group):
     else:
         pairs = json.loads(rget(url).text)['schedule'][weekday]['lessons']
 
-    print(week, (datetime - DATE(2022, 8, 29)).days)
     startTime, endTime = 0, 0
     for pair in pairs:
         for v in pair:
