@@ -248,7 +248,7 @@ def scheduleGroup(message, date):
 
 def getUniSchedule(message, date, group):
     datetime = DATE(*map(int, date.split('-')))
-    week = ceil((datetime - DATE(2022, 8, 29)).days / 7)
+    week = (datetime - DATE(2022, 8, 29)).days // 7 + 1
     weekday = str(datetime.weekday() + 1)
 
     url = f'https://schedule.mirea.ninja/api/schedule/{group}/full_schedule'
@@ -257,6 +257,7 @@ def getUniSchedule(message, date, group):
     else:
         pairs = json.loads(rget(url).text)['schedule'][weekday]['lessons']
 
+    print(week, (datetime - DATE(2022, 8, 29)).days)
     startTime, endTime = 0, 0
     for pair in pairs:
         for v in pair:
