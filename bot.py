@@ -1,9 +1,9 @@
 import json
-import requests
 from re import match
 from math import ceil
 from os import environ
 from telebot import TeleBot
+from requests import get as rget
 from datetime import date as DATE, timedelta
 from telegram_bot_pagination import InlineKeyboardPaginator
 from telebot.types import ReplyKeyboardMarkup, KeyboardButton
@@ -58,7 +58,7 @@ def fetch(from_, to_, date):
     url = f'https://api.rasp.yandex.net/v3.0/search/?apikey={KEY}' +\
           f'&format=json&from={from_}&to={to_}&lang=ru_RU&page=1&date={date}'
 
-    res = requests.get(url)
+    res = rget(url)
     return [[
         toValidTime(x['departure']), x['thread']['transport_subtype']['title']]
         for x in json.loads(res.text)['segments']]
@@ -166,6 +166,53 @@ def message_reply(message):
         bot.send_message(message.chat.id, 'Здесь ничего нет (пока что)')
 
     elif message.text == 'Получить расписание':
+        markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+        today = KeyboardButton('Сегодня')
+        tmrrw = KeyboardButton('Завтра')
+        other = KeyboardButton('Другой день')
+        markup.add(today, tmrrw, other)
+
+        bot.send_message(message.chat.id, 'Укажите день:', reply_markup=markup)
+        bot.register_next_step_handler(message, scheduleDay)
+    else:
+        bot.send_message(message.chat.id, 'Команда не распознана')
+
+
+def scheduleDay(message):
+    if message.text == 'Сегодня':
+        date = str(DATE.today())
+    elif message.text == 'Завтра':
+        date = str(DATE.today() + timedelta(days=1))
+    elif message.text == 'Другой день':
+        bot.send_message(message.chat.id, 'Укажите день в виде "dd.mm":',
+                         reply_markup=getMarkup())
+        bot.register_next_step_handler(message, otherDay)
+        return
+    else:
+        return sendErr(message)
+
+    manualOrNot1(message, date)
+
+
+def otherDay(message):
+    if not match(r'^\d\d\.\d\d$', message.text):
+        return sendErr(message)
+    date = '2022-' + '-'.join(message.text.split('.')[::-1])
+    manualOrNot1(message, date)
+
+
+def manualOrNot1(message, date):
+    markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    bypair = KeyboardButton('Расписание по группе')
+    manual = KeyboardButton('Вручную')
+    markup.add(bypair, manual)
+    bot.send_message(message.chat.id, 'Выберите что-то из списка:',
+                     reply_markup=markup)
+    bot.register_next_step_handler(message, manualOrNot2, date)
+
+
+def manualOrNot2(message, date):
+    if message.text == 'Вручную':
         markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=6)
         markup.add(*[KeyboardButton(str(i)) for i in range(1, 7)])
 
@@ -173,12 +220,61 @@ def message_reply(message):
                          '<u>первой пары</u>:\n(Время пишется в виде: XX:XX, '
                          'номер пары: число 1-6)', parse_mode='HTML',
                          reply_markup=markup)
-        bot.register_next_step_handler(message, firstPair)
+        bot.register_next_step_handler(message, firstPair, date)
+    elif message.text == 'Расписание по группе':
+        markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+        first = KeyboardButton('КББО-01-22')
+        second = KeyboardButton('ИВБО-04-22')
+        other = KeyboardButton('Другая')
+        markup.add(first, second, other)
+        bot.send_message(message.chat.id, 'Укажите вашу группу:',
+                         reply_markup=markup)
+        bot.register_next_step_handler(message, scheduleGroup, date)
     else:
-        bot.send_message(message.chat.id, 'Команда не распознана')
+        return sendErr(message)
 
 
-def firstPair(message):
+def scheduleGroup(message, date):
+    if message.text in ['КББО-01-22', 'ИВБО-04-22']:
+        group = message.text
+    elif message.text == 'Другая':
+        return bot.send_message(message.chat.id, 'Временно недоступно',
+                                reply_markup=getMarkup())
+    else:
+        return sendErr(message)
+
+    getUniSchedule(message, date, group)
+
+
+def getUniSchedule(message, date, group):
+    datetime = DATE(*map(int, date.split('-')))
+    week = ceil((datetime - DATE(2022, 8, 29)).days / 7)
+    weekday = str(datetime.weekday() + 1)
+
+    url = f'https://schedule.mirea.ninja/api/schedule/{group}/full_schedule'
+    if weekday == '7':
+        pairs = []
+    else:
+        pairs = json.loads(rget(url).text)['schedule'][weekday]['lessons']
+
+    startTime, endTime = 0, 0
+    for pair in pairs:
+        for v in pair:
+            if week in v['weeks'] and 'Дистан' not in v['rooms'][0]:
+                if not startTime:
+                    startTime = v['time_start']
+                endTime = v['time_end']
+                break
+    if startTime:
+        time = [toMinutes(x.split(':')) for x in (startTime, endTime)]
+        getSchedule(message, date, *time)
+    else:
+        bot.send_message(message.chat.id,
+                         f"Расписание на {'.'.join(date.split('-')[::-1])}:\n"
+                         'Пар нет', reply_markup=getMarkup())
+
+
+def firstPair(message, date):
     if match(r'^[1-6]$', message.text):
         startTime = startIdxToMinutes(message.text)
     elif match(r'^(0?\d|1\d|2[0-3]):([0-5]\d)$', message.text):
@@ -189,10 +285,10 @@ def firstPair(message):
     bot.send_message(message.chat.id, 'Укажите время или номер конца <u>'
                      'последней пары</u>:\n(Время пишется в виде: XX:XX, '
                      'номер пары: число 1-6)', parse_mode='HTML')
-    bot.register_next_step_handler(message, lastPair, startTime)
+    bot.register_next_step_handler(message, lastPair, date, startTime)
 
 
-def lastPair(message, startTime):
+def lastPair(message, date, startTime):
     if match(r'^[1-6]$', message.text):
         endTime = endIdxToMinutes(message.text)
     elif match(r'^(0?\d|1\d|2[0-3]):([0-5]\d)$', message.text):
@@ -206,35 +302,10 @@ def lastPair(message, startTime):
     other = KeyboardButton('Другой день')
     markup.add(today, tmrrw, other)
 
-    bot.send_message(message.chat.id, 'Укажите день:', reply_markup=markup)
-    bot.register_next_step_handler(message, scheduleDay, startTime, endTime)
+    getSchedule(message, date, startTime, endTime)
 
 
-def scheduleDay(message, startTime, endTime):
-    if message.text == 'Сегодня':
-        date = str(DATE.today())
-    elif message.text == 'Завтра':
-        date = str(DATE.today() + timedelta(days=1))
-    elif message.text == 'Другой день':
-        bot.send_message(message.chat.id, 'Укажите день в виде "dd.mm":',
-                         reply_markup=getMarkup())
-        bot.register_next_step_handler(message, otherDay, startTime, endTime)
-        return
-    else:
-        return sendErr(message)
-
-    getSchedule(message, startTime, endTime, date)
-
-
-def otherDay(message, startTime, endTime):
-    if not match(r'^\d\d\.\d\d$', message.text):
-        bot.send_message(message.chat.id, 'Неправильный ввод!')
-        return
-    date = '2022-' + '-'.join(message.text.split('.')[::-1])
-    getSchedule(message, startTime, endTime, date)
-
-
-def getSchedule(message, startTime, endTime, date):
+def getSchedule(message, date, startTime, endTime):
     bot.send_message(message.chat.id,
                      f"Расписание на {'.'.join(date.split('-')[::-1])}",
                      reply_markup=getMarkup())
