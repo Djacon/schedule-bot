@@ -1,5 +1,6 @@
+import pytz
 from re import match
-from datetime import date as DATE, timedelta
+from datetime import date as DATE, datetime, timedelta
 
 from aiogram.dispatcher.filters import Text
 from aiogram import Bot, Dispatcher, executor
@@ -29,6 +30,10 @@ def getMarkup():
     help = KeyboardButton('Настройки')
     markup.add(schedule, help)
     return markup
+
+
+def today():
+    return datetime.now(pytz.timezone('Europe/Moscow')).date()
 
 
 async def sendErr(message, state):
@@ -94,9 +99,9 @@ async def message_reply(message):
 @dp.message_handler(state=Schedule.date)
 async def scheduleDay(message, state):
     if message.text == 'Сегодня':
-        date = DATE.today()
+        date = today()
     elif message.text == 'Завтра':
-        date = DATE.today() + timedelta(days=1)
+        date = today() + timedelta(days=1)
     elif match(r'^\d\d\.\d\d$', message.text):
         date = '2022-' + '-'.join(message.text.split('.')[::-1])
     elif message.text == 'Другой день':
