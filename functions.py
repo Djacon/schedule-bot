@@ -1,6 +1,7 @@
 import json
 from math import ceil
 from os import environ
+from typing import Any, List
 from requests import get as rget
 from telegram_bot_pagination import InlineKeyboardPaginator
 
@@ -21,35 +22,35 @@ KEY = environ['KEY']
 TOKEN = environ['TOKEN']
 
 
-def toValidTime(x):
+def toValidTime(x: str) -> List:
     return x[x.find('T')+1:x.find('+')].split(':')[:2]
 
 
-def toMinutes(arr):
+def toMinutes(arr: List) -> int:
     return int(arr[0]) * 60 + int(arr[1])
 
 
-def toTime(min):
+def toTime(min: int) -> List:
     return [int(min / 60) % 24, min % 60]
 
 
-def time(x):
-    return f"{x[0]}:{str(x[1]).zfill(2)}"
+def time(arr: List) -> str:
+    return f"{arr[0]}:{str(arr[1]).zfill(2)}"
 
 
-def addTime(arr, min):
+def addTime(arr: List, min: int) -> str:
     return time(toTime(toMinutes(arr) + min))
 
 
-def startIdxToMinutes(idx):
+def startIdxToMinutes(idx: int) -> int:
     return [540, 640, 760, 860, 980, 1080][int(idx)-1]
 
 
-def endIdxToMinutes(idx):
+def endIdxToMinutes(idx: int) -> int:
     return [630, 730, 850, 950, 1070, 1170][int(idx)-1]
 
 
-def fetch(from_, to_, date):
+def fetch(from_: str, to_: str, date: str) -> List:
     url = f'https://api.rasp.yandex.net/v3.0/search/?apikey={KEY}' +\
           f'&format=json&from={from_}&to={to_}&lang=ru_RU&page=1&date={date}'
 
@@ -59,22 +60,22 @@ def fetch(from_, to_, date):
         for x in json.loads(res.text)['segments']]
 
 
-def fetchUni(group, weekday):
+def fetchUni(group: str, weekday: str) -> List:
     if weekday == '7':
-        return []
+        return [[]]
     url = f'https://schedule.mirea.ninja/api/schedule/{group}/full_schedule'
     res = rget(url)
     if res.status_code == 404:
-        return 404
+        return []
     return json.loads(res.text)['schedule'][weekday]['lessons']
 
 
-def isOnTime(time, startTime):
+def isOnTime(time: List, startTime: int) -> bool:
     return (toMinutes(time) + TOTAL_TIME_TO_WORK -
             FROM_HOME_TO_TRAIN <= startTime)
 
 
-def getInfo(from_, to_, date):
+def getInfo(from_: str, to_: str, date: str) -> List:
     if f'{from_}-{to_}:{date}' in TEMP:
         return TEMP[f'{from_}-{to_}:{date}']
 
@@ -83,14 +84,15 @@ def getInfo(from_, to_, date):
     return info
 
 
-def getLine(index, page, exitTime, name, totalTime, timeToTrain):
-    arrival = addTime(exitTime, totalTime - timeToTrain)
-    return f"{index + 1 + COUNT_OF_ITEMS * (page-1)}. {name}\n" +\
+def getLine(index: int, page: int, exitTime: int, name: str, totalTime: int,
+            timeToTrain: int) -> str:
+    return f"{index + 1 + COUNT_OF_ITEMS * (page - 1)}. {name}\n" +\
            f"{addTime(exitTime, -timeToTrain)} - {time(exitTime)} " +\
-           f"(прибытие в {arrival})\n\n"
+           f"(прибытие в {addTime(exitTime, totalTime - timeToTrain)})\n\n"
 
 
-def getScheduleForth(from_, to_, startTime, date, page=1):
+def getScheduleForth(from_: str, to_: str, startTime: int, date: str,
+                     page: int = 1) -> tuple[str, int]:
     forth = getInfo(from_, to_, date)
     forth = [x for x in forth if toMinutes(x[0]) + TOTAL_TIME_TO_WORK -
              FROM_HOME_TO_TRAIN + 40 >= startTime]
@@ -105,7 +107,8 @@ def getScheduleForth(from_, to_, startTime, date, page=1):
     return schedule, size
 
 
-def getScheduleBack(from_, to_, endTime, date, page=1):
+def getScheduleBack(from_: str, to_: str, endTime: int, date: str,
+                    page: int = 1) -> tuple[str, int]:
     back = getInfo(to_, from_, date)
     back = [x for x in back if toMinutes(x[0]) - FROM_WORK_TO_TRAIN >= endTime]
     size = ceil(len(back) / COUNT_OF_ITEMS)
@@ -118,12 +121,12 @@ def getScheduleBack(from_, to_, endTime, date, page=1):
     return schedule, size
 
 
-def parsePageData(call):
+def parsePageData(call) -> tuple[int, int, str]:
     data = call.data.split(':')
     return int(data[1]), int(data[2]), data[3]
 
 
-def getPaginator(size, time, date, dir, page=1):
+def getPaginator(size: int, time: str, date: int, dir: str, page: int = 1):
     return InlineKeyboardPaginator(size, current_page=page,
                                    data_pattern="schedule"+dir+":{page}:"
                                    f'{time}:{date}').markup

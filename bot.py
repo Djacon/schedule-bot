@@ -36,9 +36,9 @@ def today():
     return datetime.now(pytz.timezone('Europe/Moscow')).date()
 
 
-async def sendErr(message, state):
+async def sendErr(message, state, msg='Некорректный ввод!'):
     await state.finish()
-    await message.answer('Некорректный ввод!', reply_markup=getMarkup())
+    await message.answer(msg, reply_markup=getMarkup())
 
 
 @dp.message_handler(commands=['start'])
@@ -155,9 +155,9 @@ async def getUniSchedule(message, state, date, group):
     weekday = str(datetime.weekday() + 1)
     pairs = fetchUni(group, weekday)
 
-    if pairs == 404:
-        return await message.answer(f"Ошибка вывода расписания :(",
-                                    reply_markup=getMarkup())
+    if not len(pairs):
+        return await sendErr(message, state, 'Ошибка вывода расписания :(')
+
     startTime, endTime = 0, 0
     for pair in pairs:
         for v in pair:
@@ -170,8 +170,8 @@ async def getUniSchedule(message, state, date, group):
         time = [toMinutes(x.split(':')) for x in (startTime, endTime)]
         await getSchedule(message, state, date, *time)
     else:
-        await message.answer(f"Расписание на {'.'.join(date.split('-')[::-1])}"
-                             ':\nПар нет', reply_markup=getMarkup())
+        dot_date = '.'.join(date.split('-')[::-1])
+        await sendErr(message, state, f'Расписание на {dot_date}:\nПар нет')
 
 
 @dp.message_handler(state=Schedule.startTime)
