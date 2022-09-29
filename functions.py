@@ -1,7 +1,7 @@
 import json
 from math import ceil
 from os import environ
-from typing import Any, List
+from typing import List
 from requests import get as rget
 from telegram_bot_pagination import InlineKeyboardPaginator
 

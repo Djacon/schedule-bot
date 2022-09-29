@@ -41,10 +41,33 @@ async def sendErr(message, state, msg='Некорректный ввод!'):
     await message.answer(msg, reply_markup=getMarkup())
 
 
+# Admin panel (info)
+@dp.message_handler(commands=['info'])
+async def start(message: Message):
+    if message.from_user.id != 915782472:
+        await message.answer('Извините, команда доступна только админу!',
+                             reply_markup=getMarkup())
+    greet = 'Информация о боте:\n'\
+            f"Кол-во сохраненных расписаний: {len(TEMP)}"
+    await message.answer(greet, reply_markup=getMarkup())
+
+
+# Admin panel (clear)
+@dp.message_handler(commands=['clear'])
+async def start(message: Message):
+    if message.from_user.id != 915782472:
+        await message.answer('Извините, команда доступна только админу!',
+                             reply_markup=getMarkup())
+    TEMP.clear()
+    await message.answer('Сохраненные расписания успешно удалены!',
+                         reply_markup=getMarkup())
+
+
 @dp.message_handler(commands=['start'])
 async def start(message: Message):
-    greet = 'Привет юзер!\nЗдесь ты можешь легко работать с расписанием ' +\
-            'электричек.\n\nПожалуйста, выберите один из этих вариантов, ' +\
+    user = message.from_user.first_name
+    greet = f'Привет {user}!\nЗдесь ты можешь легко работать с расписанием ' +\
+            'электричек.\n\nПожалуйста, выбери один из этих вариантов, ' +\
             'представленных ниже:'
     await message.answer(greet, reply_markup=getMarkup())
 
