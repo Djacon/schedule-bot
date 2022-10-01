@@ -1,20 +1,8 @@
 import json
 from math import ceil
 from os import environ
-from typing import List
 from requests import get as rget
 from telegram_bot_pagination import InlineKeyboardPaginator
-
-FABRICHNAYA = 's9600961'
-VYKHINO = 's9601627'
-
-FROM_HOME_TO_TRAIN = 20
-FROM_WORK_TO_TRAIN = 60
-
-TOTAL_TIME_TO_WORK = 130
-TOTAL_TIME_TO_HOME = 130
-
-COUNT_OF_ITEMS = 4
 
 TEMP = {}
 
@@ -22,23 +10,23 @@ KEY = environ['KEY']
 TOKEN = environ['TOKEN']
 
 
-def toValidTime(x: str) -> List:
+def toValidTime(x: str) -> list:
     return x[x.find('T')+1:x.find('+')].split(':')[:2]
 
 
-def toMinutes(arr: List) -> int:
+def toMinutes(arr: list) -> int:
     return int(arr[0]) * 60 + int(arr[1])
 
 
-def toTime(min: int) -> List:
+def toTime(min: int) -> list:
     return [int(min / 60) % 24, min % 60]
 
 
-def time(arr: List) -> str:
+def time(arr: list) -> str:
     return f"{arr[0]}:{str(arr[1]).zfill(2)}"
 
 
-def addTime(arr: List, min: int) -> str:
+def addTime(arr: list, min: int) -> str:
     return time(toTime(toMinutes(arr) + min))
 
 
@@ -50,17 +38,17 @@ def endIdxToMinutes(idx: int) -> int:
     return [630, 730, 850, 950, 1070, 1170][int(idx)-1]
 
 
-def fetch(from_: str, to_: str, date: str) -> List:
+def fetch(from_: str, to_: str, date: str) -> list:
     url = f'https://api.rasp.yandex.net/v3.0/search/?apikey={KEY}' +\
           f'&format=json&from={from_}&to={to_}&lang=ru_RU&page=1&date={date}'
 
     res = rget(url)
     return [[
-        toValidTime(x['departure']), x['thread']['transport_subtype']['title']]
-        for x in json.loads(res.text)['segments']]
+        toValidTime(x['departure']), x['thread']['transport_subtype']['title'],
+        int(x['duration'] / 60)] for x in json.loads(res.text)['segments']]
 
 
-def fetchUni(group: str, weekday: str) -> List:
+def fetchUni(group: str, weekday: str) -> list:
     if weekday == '7':
         return [[]]
     url = f'https://schedule.mirea.ninja/api/schedule/{group}/full_schedule'
@@ -70,12 +58,12 @@ def fetchUni(group: str, weekday: str) -> List:
     return json.loads(res.text)['schedule'][weekday]['lessons']
 
 
-def isOnTime(time: List, startTime: int) -> bool:
-    return (toMinutes(time) + TOTAL_TIME_TO_WORK -
-            FROM_HOME_TO_TRAIN <= startTime)
+def isOnTime(time: list, startTime: int, departure: int,
+             timeToWork: int) -> bool:
+    return (toMinutes(time) + departure + timeToWork <= startTime)
 
 
-def getInfo(from_: str, to_: str, date: str) -> List:
+def getInfo(from_: str, to_: str, date: str) -> list:
     if f'{from_}-{to_}:{date}' in TEMP:
         return TEMP[f'{from_}-{to_}:{date}']
 
@@ -84,49 +72,53 @@ def getInfo(from_: str, to_: str, date: str) -> List:
     return info
 
 
-def getLine(index: int, page: int, exitTime: int, name: str, totalTime: int,
-            timeToTrain: int) -> str:
-    return f"{index + 1 + COUNT_OF_ITEMS * (page - 1)}. {name}\n" +\
+def getLine(index: int, page: int, exitTime: int, name: str, departure: int,
+            timeToTrain: int, timeFromTrain, countOfItems: int) -> str:
+    return f"{index + 1 + countOfItems * (page - 1)}. {name}\n" +\
            f"{addTime(exitTime, -timeToTrain)} - {time(exitTime)} " +\
-           f"(прибытие в {addTime(exitTime, totalTime - timeToTrain)})\n\n"
+           f"(прибытие в {addTime(exitTime, departure + timeFromTrain)})\n\n"
 
 
-def getScheduleForth(from_: str, to_: str, startTime: int, date: str,
+def getScheduleForth(user: list, startTime: int, date: str,
                      page: int = 1) -> tuple[str, int]:
-    forth = getInfo(from_, to_, date)
-    forth = [x for x in forth if toMinutes(x[0]) + TOTAL_TIME_TO_WORK -
-             FROM_HOME_TO_TRAIN + 40 >= startTime]
-    size = ceil(len(forth) / COUNT_OF_ITEMS)
-    forth = forth[COUNT_OF_ITEMS * (page-1): COUNT_OF_ITEMS * page]
+    homeS, workS, homeT, workT, count = user
+    forth = getInfo(homeS, workS, date)
+    forth = [x for x in forth if toMinutes(x[0]) + x[2] +
+             workT + 40 >= startTime]
+    size = ceil(len(forth) / count)
+    forth = forth[count * (page-1): count * page]
 
     schedule = 'Туда:\nВремя выхода - посадки\n\n'
     for i, x in enumerate(forth):
-        mark = '✅' if isOnTime(x[0], startTime) else '❌'
-        schedule += f'{mark} ' + getLine(i, page, *x, TOTAL_TIME_TO_WORK,
-                                         FROM_HOME_TO_TRAIN)
+        mark = '❌✅'[isOnTime(x[0], startTime, x[2], workT)]
+        schedule += f'{mark} ' + getLine(i, page, *x, homeT, workT, count)
     return schedule, size
 
 
-def getScheduleBack(from_: str, to_: str, endTime: int, date: str,
+def getScheduleBack(user: list, endTime: int, date: str,
                     page: int = 1) -> tuple[str, int]:
-    back = getInfo(to_, from_, date)
-    back = [x for x in back if toMinutes(x[0]) - FROM_WORK_TO_TRAIN >= endTime]
-    size = ceil(len(back) / COUNT_OF_ITEMS)
-    back = back[COUNT_OF_ITEMS * (page-1): COUNT_OF_ITEMS * page]
+    homeS, workS, homeT, workT, count = user
+    back = getInfo(workS, homeS, date)
+    back = [x for x in back if toMinutes(x[0]) - workT >= endTime]
+    size = ceil(len(back) / count)
+    back = back[count * (page-1): count * page]
 
     schedule = 'Обратно:\nВремя выхода - посадки\n\n'
     for i, x in enumerate(back):
-        schedule += getLine(i, page, *x, TOTAL_TIME_TO_HOME,
-                            FROM_WORK_TO_TRAIN)
+        schedule += getLine(i, page, *x, workT, homeT, count)
     return schedule, size
 
 
-def parsePageData(call) -> tuple[int, int, str]:
+def parsePageData(call) -> tuple:
     data = call.data.split(':')
-    return int(data[1]), int(data[2]), data[3]
+    return (int(data[1]), int(data[2]), *data[3:6],
+            int(data[6]), int(data[7]), int(data[8]))
 
 
-def getPaginator(size: int, time: str, date: int, dir: str, page: int = 1):
+def getPaginator(size: int, time: str, date: int, user: list, dir: str,
+                 page: int = 1):
+    homeS, workS, homeT, workT, count = user
     return InlineKeyboardPaginator(size, current_page=page,
                                    data_pattern="schedule"+dir+":{page}:"
-                                   f'{time}:{date}').markup
+                                   f'{time}:{date}:{homeS}:{workS}:{homeT}:'
+                                   f'{workT}:{count}').markup

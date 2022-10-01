@@ -1,5 +1,5 @@
 import pytz
-from re import match
+from re import L, match
 from datetime import date as DATE, datetime, timedelta
 
 from aiogram.dispatcher.filters import Text
@@ -10,6 +10,7 @@ from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, Message
 
 from functions import *
+from database import *
 
 bot = Bot(TOKEN)
 
@@ -24,11 +25,27 @@ class Schedule(StatesGroup):
     endTime = State()
 
 
+class Settings(StatesGroup):
+    settings = State()
+    homeStation = State()
+    workStation = State()
+    timeToHome = State()
+    timeToWork = State()
+    countOfItems = State()
+
+
 def getMarkup():
     markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
     schedule = KeyboardButton('Получить расписание')
     help = KeyboardButton('Настройки')
     markup.add(schedule, help)
+    return markup
+
+
+def getBack():
+    markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
+    back = KeyboardButton('<- Назад')
+    markup.add(back)
     return markup
 
 
@@ -41,14 +58,37 @@ async def sendErr(message, state, msg='Некорректный ввод!'):
     await message.answer(msg, reply_markup=getMarkup())
 
 
+async def getSettings(message):
+    markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    homeS = KeyboardButton('Станция у дома')
+    workS = KeyboardButton('Станция у вуза')
+    homeT = KeyboardButton('Время от дома до станции')
+    workT = KeyboardButton('Время от вуза до станции')
+    count = KeyboardButton('Количество выводимых электричек')
+    back = KeyboardButton('<- Назад')
+    markup.add(homeS, workS, homeT, workT, count, back)
+
+    user = getUserInfo(message.from_user.id)
+    info = f"Станция у дома: *{user[0].capitalize()}*,\n"\
+           f"Станция у вуза: *{user[1].capitalize()}*,\n"\
+           f"Время от дома до станции: *{user[2]} мин*,\n"\
+           f"Время от вуза до станции: *{user[3]} мин*,\n"\
+           f"Количество выводимых электричек: *{user[4]}*"
+
+    await Settings.settings.set()
+    await message.answer(info, parse_mode='markdown', reply_markup=markup)
+
+
 # Admin panel (info)
 @dp.message_handler(commands=['info'])
 async def start(message: Message):
     if message.from_user.id != 915782472:
         await message.answer('Извините, команда доступна только админу!',
                              reply_markup=getMarkup())
+        return
     greet = 'Информация о боте:\n'\
-            f"Кол-во сохраненных расписаний: {len(TEMP)}"
+            f"Кол-во сохраненных расписаний: {len(TEMP)}\n"\
+            f"Кол-во пользователей в БД: {len(USERS)}"
     await message.answer(greet, reply_markup=getMarkup())
 
 
@@ -58,6 +98,7 @@ async def start(message: Message):
     if message.from_user.id != 915782472:
         await message.answer('Извините, команда доступна только админу!',
                              reply_markup=getMarkup())
+        return
     TEMP.clear()
     await message.answer('Сохраненные расписания успешно удалены!',
                          reply_markup=getMarkup())
@@ -74,17 +115,17 @@ async def start(message: Message):
 
 @dp.callback_query_handler(Text(startswith='scheduleF'))
 async def scheduleF_page_callback(call):
-    page, time, date = parsePageData(call)
-    schedule, size = getScheduleForth(FABRICHNAYA, VYKHINO, time, date, page)
-    markup = getPaginator(size, time, date, 'F', page)
+    page, time, date, *user = parsePageData(call)
+    schedule, size = getScheduleForth(user, time, date, page)
+    markup = getPaginator(size, time, date, user, 'F', page)
     await editMessage(schedule, call.message, markup)
 
 
 @dp.callback_query_handler(Text(startswith='scheduleB'))
 async def scheduleB_page_callback(call):
-    page, time, date = parsePageData(call)
-    schedule, size = getScheduleBack(FABRICHNAYA, VYKHINO, time, date, page)
-    markup = getPaginator(size, time, date, 'B', page)
+    page, time, date, *user = parsePageData(call)
+    schedule, size = getScheduleBack(user, time, date, page)
+    markup = getPaginator(size, time, date, user, 'B', page)
     await editMessage(schedule, call.message, markup)
 
 
@@ -105,7 +146,8 @@ async def message_not_modified_handler(*_):
 @dp.message_handler(content_types='text')
 async def message_reply(message):
     if message.text == 'Настройки':
-        await message.answer('Здесь ничего нет (пока что)')
+        await message.answer('Что бы вы хотели изменить?')
+        await getSettings(message)
     elif message.text == 'Получить расписание':
         markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
         today = KeyboardButton('Сегодня')
@@ -117,6 +159,98 @@ async def message_reply(message):
         await message.answer('Укажите день:', reply_markup=markup)
     else:
         await message.answer('Команда не распознана')
+
+
+@dp.message_handler(state=Settings.settings)
+async def settings(message, state):
+    if message.text == 'Станция у дома':
+        await Settings.homeStation.set()
+        await message.answer('Укажите название станции:',
+                             reply_markup=getBack())
+    elif message.text == 'Станция у вуза':
+        await Settings.workStation.set()
+        await message.answer('Укажите название станции:',
+                             reply_markup=getBack())
+    elif message.text == 'Время от дома до станции':
+        await Settings.timeToHome.set()
+        await message.answer('Укажите время (в минутах):',
+                             reply_markup=getBack())
+    elif message.text == 'Время от вуза до станции':
+        await Settings.timeToWork.set()
+        await message.answer('Укажите время (в минутах):',
+                             reply_markup=getBack())
+    elif message.text == 'Количество выводимых электричек':
+        await Settings.countOfItems.set()
+        await message.answer('Укажите количество выводимых электричек:',
+                             reply_markup=getBack())
+    elif message.text == '<- Назад':
+        await sendErr(message, state, 'Хорошо')
+    else:
+        await sendErr(message, state)
+
+
+@dp.message_handler(state=Settings.homeStation)
+async def homeStation(message, state):
+    stations = getStations()
+    station = message.text.lower()
+    if station in stations:
+        editUserInfo(message.from_user.id, 0, station)
+        await sendErr(message, state, 'Изменено!')
+    elif message.text != '<- Назад':
+        return await sendErr(message, state, 'Станция не найдена!')
+    await getSettings(message)
+
+
+@dp.message_handler(state=Settings.workStation)
+async def workStation(message, state):
+    stations = getStations()
+    station = message.text.lower()
+    if station in stations:
+        editUserInfo(message.from_user.id, 1, station)
+        await sendErr(message, state, 'Изменено!')
+    elif message.text != '<- Назад':
+        return await sendErr(message, state, 'Станция не найдена!')
+    await getSettings(message)
+
+
+@dp.message_handler(state=Settings.timeToHome)
+async def timeToHome(message, state):
+    if match(r'^[1-9]\d*$', message.text):
+        count = int(message.text)
+        if count > 600:
+            return await sendErr(message, state, 'Слишком большое число!')
+        editUserInfo(message.from_user.id, 2, int(message.text))
+        await sendErr(message, state, 'Изменено!')
+    elif message.text != '<- Назад':
+        return await sendErr(message, state)
+    await getSettings(message)
+
+
+@dp.message_handler(state=Settings.timeToWork)
+async def timeToWork(message, state):
+    if match(r'^[1-9]\d*$', message.text):
+        count = int(message.text)
+        if count > 600:
+            return await sendErr(message, state, 'Слишком большое число!')
+        editUserInfo(message.from_user.id, 3, int(message.text))
+        await sendErr(message, state, 'Изменено!')
+    elif message.text != '<- Назад':
+        return await sendErr(message, state)
+    await getSettings(message)
+
+
+@dp.message_handler(state=Settings.countOfItems)
+async def countOfItems(message, state):
+    if match(r'^[1-9]\d*$', message.text):
+        count = int(message.text)
+        if count > 10:
+            return await sendErr(message, state,
+                                 'Не поддерживается вывод более 10 значений!')
+        editUserInfo(message.from_user.id, 4, count)
+        await sendErr(message, state, 'Изменено!')
+    elif message.text != '<- Назад':
+        return await sendErr(message, state)
+    await getSettings(message)
 
 
 @dp.message_handler(state=Schedule.date)
@@ -163,13 +297,13 @@ async def manualOrNot(message, state):
         markup.add(first, second, other)
         await message.answer('Укажите вашу группу:', reply_markup=markup)
     elif message.text == 'Другая':
-        return await message.answer('Укажите группу в виде "XXXX-XX-XX":')
+        await message.answer('Укажите группу в виде "XXXX-XX-XX":')
     elif match(r'[А-Я]{4}-\d\d-\d\d', message.text):
         group = message.text
         async with state.proxy() as data:
             await getUniSchedule(message, state, data['date'], group)
     else:
-        return await sendErr(message, state)
+        await sendErr(message, state)
 
 
 async def getUniSchedule(message, state, date, group):
@@ -240,13 +374,18 @@ async def getSchedule(message, state, date, startTime, endTime):
     await message.answer(f"Расписание на {'.'.join(date.split('-')[::-1])}",
                          reply_markup=getMarkup())
 
-    schedule, size = getScheduleForth(FABRICHNAYA, VYKHINO, startTime, date)
-    markup = getPaginator(size, startTime, date, 'F')
-    await message.answer(schedule, reply_markup=markup)
+    usr = getUserInfo(message.from_user.id)
+    user = [*getStationsCodes(usr[0], usr[1]), *usr[2:]]
+    try:
+        schedule, size = getScheduleForth(user, startTime, date)
+        markup = getPaginator(size, startTime, date, user, 'F')
+        await message.answer(schedule, reply_markup=markup)
 
-    schedule, size = getScheduleBack(FABRICHNAYA, VYKHINO, endTime, date)
-    markup = getPaginator(size, endTime, date, 'B')
-    await message.answer(schedule, reply_markup=markup)
+        schedule, size = getScheduleBack(user, endTime, date)
+        markup = getPaginator(size, endTime, date, user, 'B')
+        await message.answer(schedule, reply_markup=markup)
+    except KeyError:
+        await message.answer('Ошибка вывода расписания :(')
 
 
 if __name__ == '__main__':
