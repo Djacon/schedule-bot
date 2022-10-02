@@ -11,7 +11,7 @@ TOKEN = environ['TOKEN']
 
 
 def toValidTime(x: str) -> list:
-    return x[x.find('T')+1:x.find('+')].split(':')[:2]
+    return x[x.find('T') + 1: x.find('+')].split(':')[:2]
 
 
 def toMinutes(arr: list) -> int:
@@ -122,3 +122,17 @@ def getPaginator(size: int, time: str, date: int, user: list, dir: str,
                                    data_pattern="schedule"+dir+":{page}:"
                                    f'{time}:{date}:{homeS}:{workS}:{homeT}:'
                                    f'{workT}:{count}').markup
+
+
+def getStartEndTimes(pairs: list, week: int) -> list:
+    stime, etime = 0, 0
+    for pair in pairs:
+        for v in pair:
+            if week in v['weeks'] and 'Дистан' not in v['rooms'][0]:
+                if not stime:
+                    stime = v['time_start']
+                etime = v['time_end']
+                break
+    if stime:
+        return [toMinutes(x.split(':')) for x in (stime, etime)]
+    return [stime, etime]
