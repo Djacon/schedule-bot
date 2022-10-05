@@ -1,30 +1,46 @@
-import json
+import sqlite3
 
-USERS = {}
-
-
-def getUserInfo(userID: int) -> list:
-    if userID not in USERS:
-        USERS[userID] = [
-            'фабричная',  # Home Station
-            'выхино',     # Work Station
-            20,           # From Home To Train
-            60,           # From Work To Train
-            4,            # Count Of Items
-        ]
-    return USERS[userID]
+DEFAULT = ('фабричная', 'выхино', 20, 60, 4)
+COLUMNS = ('homestation', 'workstation', 'hometotrain', 'worktotrain',
+           'countofitems')
 
 
-def editUserInfo(userID: str, index: int, value):
-    USERS[userID][index] = value
+class USERS:
+    def __init__(self, filename: str):
+        self.db = sqlite3.connect(filename)
+        self.sql = self.db.cursor()
+
+        self.sql.execute("""CREATE TABLE IF NOT EXISTS users (
+            userid INT PRIMARY KEY  NOT NULL,
+            homestation        TEXT NOT NULL,
+            workstation        TEXT NOT NULL,
+            hometotrain        INT  NOT NULL,
+            worktotrain        INT  NOT NULL,
+            countofitems       INT  NOT NULL
+        )""")
+
+    def addUser(self, userid: int):
+        self.sql.execute('INSERT INTO users VALUES (?, ?, ?, ?, ?, ?)',
+                         (userid, *DEFAULT))
+        self.db.commit()
+
+    def getUser(self, userid: int) -> tuple:
+        res = self.sql.execute('SELECT * FROM users WHERE userid = ?',
+                               (userid,))
+        user = res.fetchall()
+
+        if not len(user):
+            self.addUser(userid)
+            return DEFAULT
+        return user[0][1:]
+
+    def editUser(self, userid: int, i: int, value):
+        self.sql.execute(f"UPDATE users SET {COLUMNS[i]} = ? WHERE userid = ?",
+                         (value, userid))
+        self.db.commit()
+
+    def userCount(self) -> int:
+        return self.sql.execute('SELECT COUNT(*) FROM users').fetchone()[0]
 
 
-def getStations() -> dict:
-    with open('stations.json', 'r', encoding='utf-8') as f:
-        stations = json.loads(f.read())
-        return stations
-
-
-def getStationsCodes(forth: str, back: str) -> tuple[str, str]:
-    stations = getStations()
-    return stations[forth], stations[back]
+DB = USERS('users.db')

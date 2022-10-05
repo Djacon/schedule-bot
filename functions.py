@@ -136,3 +136,14 @@ def getStartEndTimes(pairs: list, week: int) -> list:
     if stime:
         return [toMinutes(x.split(':')) for x in (stime, etime)]
     return [stime, etime]
+
+
+def getStations() -> dict:
+    with open('stations.json', 'r', encoding='utf-8') as f:
+        stations = json.loads(f.read())
+        return stations
+
+
+def getStationsCodes(forth: str, back: str) -> tuple[str, str]:
+    stations = getStations()
+    return stations[forth], stations[back]

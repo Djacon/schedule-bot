@@ -11,6 +11,7 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, Message
 
 from functions import *
 from database import *
+from database import DB
 
 bot = Bot(TOKEN)
 
@@ -68,7 +69,7 @@ async def getSettings(message: Message):
     back = KeyboardButton('<- Назад')
     markup.add(homeS, workS, homeT, workT, count, back)
 
-    user = getUserInfo(message.from_user.id)
+    user = DB.getUser(message.from_user.id)
     info = f"Станция у дома: *{user[0].capitalize()}*,\n"\
            f"Станция у вуза: *{user[1].capitalize()}*,\n"\
            f"Время от дома до станции: *{user[2]} мин*,\n"\
@@ -88,7 +89,7 @@ async def info(message: Message):
         return
     greet = 'Информация о боте:\n'\
             f"Кол-во сохраненных расписаний: {len(TEMP)}\n"\
-            f"Кол-во пользователей в БД: {len(USERS)}"
+            f"Кол-во пользователей в БД: {DB.userCount()}"
     await message.answer(greet)
 
 
@@ -191,7 +192,7 @@ async def handleStation(message: Message, state, index: int):
     stations = getStations()
     station = message.text.lower()
     if station in stations:
-        editUserInfo(message.from_user.id, index, station)
+        DB.editUser(message.from_user.id, index, station)
         await sendErr(message, state, 'Изменено')
     elif message.text != '<- Назад':
         return await sendErr(message, state, 'Станция не найдена')
@@ -203,7 +204,7 @@ async def handleTime(message: Message, state, index: int):
         count = int(message.text)
         if count > 600:
             return await sendErr(message, state, 'Слишком большое число!')
-        editUserInfo(message.from_user.id, index, int(message.text))
+        DB.editUser(message.from_user.id, index, count)
         await sendErr(message, state, 'Изменено!')
     elif message.text != '<- Назад':
         return await sendErr(message, state)
@@ -237,7 +238,7 @@ async def countOfItems(message: Message, state):
         if count > 10:
             return await sendErr(message, state,
                                  'Не поддерживается вывод более 10 значений!')
-        editUserInfo(message.from_user.id, 4, count)
+        DB.editUser(message.from_user.id, 4, count)
         await sendErr(message, state, 'Изменено!')
     elif message.text != '<- Назад':
         return await sendErr(message, state)
@@ -357,7 +358,7 @@ async def getSchedule(message: Message, state, date: str, startTime: int,
     await state.finish()
     await message.answer(f"Расписание на {'.'.join(date.split('-')[::-1])}",
                          reply_markup=getMain())
-    usr = getUserInfo(message.from_user.id)
+    usr = DB.getUser(message.from_user.id)
     user = [*getStationsCodes(usr[0], usr[1]), *usr[2:]]
     try:
         schedule, size = getScheduleForth(user, startTime, date)
