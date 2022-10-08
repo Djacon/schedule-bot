@@ -1,2 +1,8 @@
 # VisualStudioCode
 .vscode
+
+# Pycache
+__pycache__
+
+# Database
+users.db

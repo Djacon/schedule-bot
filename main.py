@@ -302,7 +302,8 @@ async def getUniSchedule(message: Message, state, date: str, group: str):
     pairs = fetchUni(group, weekday)
 
     if not len(pairs):
-        return await sendErr(message, state, 'Ошибка вывода расписания :(')
+        return await sendErr(message, state, 'Ведутся временные работы в mirea'
+                             '.api\nПожалуйста, воспользуйтесь ручным режимом')
 
     startTime, endTime = getStartEndTimes(pairs, week)
     if startTime:
