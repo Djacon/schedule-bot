@@ -80,7 +80,7 @@ def getLine(index: int, page: int, exitTime: int, name: str, departure: int,
 
 
 def getScheduleForth(user: list, startTime: int, date: str,
-                     page: int = 1) -> tuple[str, int]:
+                     page: int = 1) -> tuple:
     homeS, workS, homeT, workT, count = user
     forth = getInfo(homeS, workS, date)
     forth = [x for x in forth if toMinutes(x[0]) + x[2] +
@@ -96,7 +96,7 @@ def getScheduleForth(user: list, startTime: int, date: str,
 
 
 def getScheduleBack(user: list, endTime: int, date: str,
-                    page: int = 1) -> tuple[str, int]:
+                    page: int = 1) -> tuple:
     homeS, workS, homeT, workT, count = user
     back = getInfo(workS, homeS, date)
     back = [x for x in back if toMinutes(x[0]) - workT >= endTime]
@@ -144,6 +144,6 @@ def getStations() -> dict:
         return stations
 
 
-def getStationsCodes(forth: str, back: str) -> tuple[str, str]:
+def getStationsCodes(forth: str, back: str) -> tuple:
     stations = getStations()
     return stations[forth], stations[back]

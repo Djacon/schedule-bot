@@ -10,7 +10,6 @@ from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, Message
 
 from functions import *
-from database import *
 from database import DB
 
 bot = Bot(TOKEN)
@@ -128,11 +127,9 @@ async def scheduleB_page_callback(call):
     await editMessage(schedule, call.message, markup)
 
 
-async def editMessage(schedule: str, msg, markup):
-    await bot.edit_message_text(
+async def editMessage(schedule: str, message, markup):
+    await message.edit_text(
         schedule,
-        msg.chat.id,
-        msg.message_id,
         reply_markup=markup
     )
 
