@@ -147,3 +147,7 @@ def getStations() -> dict:
 def getStationsCodes(forth: str, back: str) -> tuple:
     stations = getStations()
     return stations[forth], stations[back]
+
+
+def isAdmin(message) -> bool:
+    return message.from_user.id in [915782472]
