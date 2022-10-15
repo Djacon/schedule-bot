@@ -21,8 +21,9 @@ def getPanelKb():
     homeT = KeyboardButton('Время от дома до станции')
     workT = KeyboardButton('Время от вуза до станции')
     count = KeyboardButton('Количество выводимых электричек')
+    group = KeyboardButton('Группа в вузе')
     back = KeyboardButton('<- Назад')
-    return markup.add(homeS, workS, homeT, workT, count, back)
+    return markup.add(homeS, workS, homeT, workT, count, group).row(back)
 
 
 def getScheduleKb():
@@ -35,9 +36,10 @@ def getScheduleKb():
 
 def getGearboxKb():
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
-    bypair = KeyboardButton('Расписание по группе')
+    myself = KeyboardButton('Расписание по моей группе')
+    other = KeyboardButton('Расписание по другой группе')
     manual = KeyboardButton('Вручную')
-    return markup.add(bypair, manual)
+    return markup.add(myself).row(other).row(manual)
 
 
 def getPairsKb():

@@ -45,7 +45,8 @@ def fetch(from_: str, to_: str, date: str) -> list:
     res = rget(url)
     return [[
         toValidTime(x['departure']), x['thread']['transport_subtype']['title'],
-        int(x['duration'] / 60)] for x in json.loads(res.text)['segments']]
+        int(x['duration'] / 60),
+        x['thread']['short_title']] for x in json.loads(res.text)['segments']]
 
 
 def fetchUni(group: str, weekday: str) -> list:
@@ -73,8 +74,9 @@ def getInfo(from_: str, to_: str, date: str) -> list:
 
 
 def getLine(index: int, page: int, exitTime: int, name: str, departure: int,
-            timeToTrain: int, timeFromTrain, countOfItems: int) -> str:
-    return f"{index + 1 + countOfItems * (page - 1)}. {name}\n" +\
+            title: str, timeToTrain: int, timeFromTrain, countOfItems: int
+            ) -> str:
+    return f"{index + 1 + countOfItems * (page - 1)}. {title}\n{name}\n" +\
            f"{addTime(exitTime, -timeToTrain)} - {time(exitTime)} " +\
            f"(прибытие в {addTime(exitTime, departure + timeFromTrain)})\n\n"
 

@@ -3,7 +3,6 @@ from re import match
 from datetime import date as DATE, datetime, timedelta
 
 from aiogram.types import Message
-from aiogram.dispatcher.filters import Text
 from aiogram import Bot, Dispatcher, executor
 from aiogram.utils.exceptions import MessageNotModified
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
@@ -33,6 +32,7 @@ class Settings(StatesGroup):
     timeToHome = State()
     timeToWork = State()
     countOfItems = State()
+    group = State()
 
 
 def today():
@@ -50,7 +50,8 @@ async def getSettings(message: Message):
            f"Станция у вуза: *{user[1].capitalize()}*,\n"\
            f"Время от дома до станции: *{user[2]} мин*,\n"\
            f"Время от вуза до станции: *{user[3]} мин*,\n"\
-           f"Количество выводимых электричек: *{user[4]}*"
+           f"Количество выводимых электричек: *{user[4]}*,\n"\
+           f"Группа в вузе: *{user[5]}*"
     await Settings.settings.set()
     await message.answer(info, parse_mode='markdown', reply_markup=panelKb)
 
@@ -86,11 +87,28 @@ async def start(message: Message):
     await message.answer(greet, reply_markup=mainKb)
 
 
+@dp.message_handler(commands=['today'])
+async def todayS(message: Message):
+    group = DB.getUser(message.from_user.id)[5]
+    if group == 'Не указана':
+        return await message.answer('Вы не указывали свою группу!')
+    await getUniSchedule(message, str(today()), group)
+
+
+@dp.message_handler(commands=['tomorrow'])
+async def tmmrwS(message: Message):
+    group = DB.getUser(message.from_user.id)[5]
+    if group == 'Не указана':
+        return await message.answer('Вы не указывали свою группу!')
+    await getUniSchedule(message, str(today() + timedelta(days=1)), group)
+
+
 @dp.callback_query_handler(lambda c: c.data.startswith('scheduleF'))
 async def scheduleF_page_callback(call):
     page, time, date, *user = parsePageData(call)
     schedule, size = getScheduleForth(user, time, date, page)
     markup = getPaginator(size, time, date, user, 'F', page)
+    await bot.answer_callback_query(call.id)
     await editMessage(schedule, call.message, markup)
 
 
@@ -99,6 +117,7 @@ async def scheduleB_page_callback(call):
     page, time, date, *user = parsePageData(call)
     schedule, size = getScheduleBack(user, time, date, page)
     markup = getPaginator(size, time, date, user, 'B', page)
+    await bot.answer_callback_query(call.id)
     await editMessage(schedule, call.message, markup)
 
 
@@ -120,7 +139,7 @@ async def message_reply(message: Message):
         await Schedule.date.set()
         await message.answer('Укажите день:', reply_markup=scheduleKb)
     else:
-        await message.answer('Команда не распознана')
+        await message.answer('Команда не распознана', reply_markup=mainKb)
 
 
 @dp.message_handler(state=Settings.settings)
@@ -140,6 +159,10 @@ async def settings(message: Message, state):
     elif message.text == 'Количество выводимых электричек':
         await Settings.countOfItems.set()
         await message.answer('Укажите количество выводимых электричек:',
+                             reply_markup=backKb)
+    elif message.text == 'Группа в вузе':
+        await Settings.group.set()
+        await message.answer('Укажите группу в виде "XXXX-XX-XX":',
                              reply_markup=backKb)
     elif message.text == '<- Назад':
         await sendErr(message, state, 'Хорошо')
@@ -204,6 +227,16 @@ async def countOfItems(message: Message, state):
     await getSettings(message)
 
 
+@dp.message_handler(state=Settings.group)
+async def uniGroup(message: Message, state):
+    if match(r'[А-Я]{4}-\d\d-\d\d', message.text):
+        DB.editUser(message.from_user.id, 5, message.text)
+        await sendErr(message, state, 'Изменено!')
+    elif message.text != '<- Назад':
+        return await sendErr(message, state)
+    await getSettings(message)
+
+
 @dp.message_handler(state=Schedule.date)
 async def scheduleDay(message: Message, state):
     if message.text == 'Сегодня':
@@ -232,34 +265,46 @@ async def manualOrNot(message: Message, state):
                              '<u>первой пары</u>:\n(Время пишется в виде: '
                              'XX:XX, номер пары: число 1-6)',
                              parse_mode='HTML', reply_markup=pairsKb)
-    elif message.text == 'Расписание по группе':
-        await message.answer('Укажите вашу группу:', reply_markup=groupKb)
+    elif message.text == 'Расписание по другой группе':
+        await message.answer('Укажите группу:', reply_markup=groupKb)
+    elif message.text == 'Расписание по моей группе':
+        group = DB.getUser(message.from_user.id)[5]
+        if group == 'Не указана':
+            await sendErr(message, state, 'Вы не указывали свою группу!')
+        else:
+            async with state.proxy() as data:
+                await getUniSchedule(message, data['date'], group)
+            await state.finish()
     elif message.text == 'Другая':
         await message.answer('Укажите группу в виде "XXXX-XX-XX":')
     elif match(r'[А-Я]{4}-\d\d-\d\d', message.text):
         group = message.text
         async with state.proxy() as data:
-            await getUniSchedule(message, state, data['date'], group)
+            await getUniSchedule(message, data['date'], group)
+        await state.finish()
     else:
         await sendErr(message, state)
 
 
-async def getUniSchedule(message: Message, state, date: str, group: str):
+async def getUniSchedule(message: Message, date: str, group: str):
     datetime = DATE(*map(int, date.split('-')))
     week = (datetime - DATE(2022, 8, 29)).days // 7 + 1
     weekday = str(datetime.weekday() + 1)
     pairs = fetchUni(group, weekday)
 
     if not len(pairs):
-        return await sendErr(message, state, 'Ведутся временные работы в mirea'
-                             '.api\nПожалуйста, воспользуйтесь ручным режимом')
+        await message.answer('Ведутся временные работы в mirea.api\n'
+                             'Пожалуйста, воспользуйтесь ручным режимом',
+                             reply_markup=mainKb)
+        return
 
     startTime, endTime = getStartEndTimes(pairs, week)
     if startTime:
-        await getSchedule(message, state, date, startTime, endTime)
+        await getSchedule(message, date, startTime, endTime)
     else:
         dot_date = '.'.join(date.split('-')[::-1])
-        await sendErr(message, state, f'Расписание на {dot_date}:\nПар нет')
+        await message.answer(f'Расписание на {dot_date}:\nПар нет',
+                             reply_markup=mainKb)
 
 
 @dp.message_handler(state=Schedule.startTime)
@@ -290,17 +335,16 @@ async def lastPair(message: Message, state):
         return await sendErr(message, state)
 
     async with state.proxy() as data:
-        await getSchedule(message, state, data['date'], data['startTime'],
-                          endTime)
-
-
-async def getSchedule(message: Message, state, date: str, startTime: int,
-                      endTime: int):
+        await getSchedule(message, data['date'], data['startTime'], endTime)
     await state.finish()
+
+
+async def getSchedule(message: Message, date: str, startTime: int,
+                      endTime: int):
     await message.answer(f"Расписание на {'.'.join(date.split('-')[::-1])}",
                          reply_markup=mainKb)
     usr = DB.getUser(message.from_user.id)
-    user = [*getStationsCodes(usr[0], usr[1]), *usr[2:]]
+    user = [*getStationsCodes(usr[0], usr[1]), *usr[2:-1]]
     try:
         schedule, size = getScheduleForth(user, startTime, date)
         markup = getPaginator(size, startTime, date, user, 'F')

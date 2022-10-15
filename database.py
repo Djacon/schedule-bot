@@ -1,8 +1,8 @@
 import sqlite3
 
-DEFAULT = ('фабричная', 'выхино', 20, 60, 4)
+DEFAULT = ('фабричная', 'выхино', 20, 65, 3, 'Не указана')
 COLUMNS = ('homestation', 'workstation', 'hometotrain', 'worktotrain',
-           'countofitems')
+           'countofitems', 'unigroup')
 
 
 class USERS:
@@ -16,11 +16,12 @@ class USERS:
             workstation        TEXT NOT NULL,
             hometotrain        INT  NOT NULL,
             worktotrain        INT  NOT NULL,
-            countofitems       INT  NOT NULL
+            countofitems       INT  NOT NULL,
+            unigroup           TEXT NOT NULL
         )""")
 
     def addUser(self, userid: int):
-        self.sql.execute('INSERT INTO users VALUES (?, ?, ?, ?, ?, ?)',
+        self.sql.execute('INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?)',
                          (userid, *DEFAULT))
         self.db.commit()
 
