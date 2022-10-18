@@ -1,6 +1,6 @@
 import sqlite3
 
-DEFAULT = ('фабричная', 'выхино', 20, 65, 3, 'Не указана')
+DEFAULT = ('фабричная', 'выхино', 20, 60, 4, 'Не указана')
 COLUMNS = ('homestation', 'workstation', 'hometotrain', 'worktotrain',
            'countofitems', 'unigroup')
 

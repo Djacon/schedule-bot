@@ -50,7 +50,7 @@ async def getSettings(message: Message):
            f"Станция у вуза: *{user[1].capitalize()}*,\n"\
            f"Время от дома до станции: *{user[2]} мин*,\n"\
            f"Время от вуза до станции: *{user[3]} мин*,\n"\
-           f"Количество выводимых электричек: *{user[4]}*,\n"\
+           f"Кол-во выводимых электричек: *{user[4]}*,\n"\
            f"Группа в вузе: *{user[5]}*"
     await Settings.settings.set()
     await message.answer(info, parse_mode='markdown', reply_markup=panelKb)
@@ -265,16 +265,8 @@ async def manualOrNot(message: Message, state):
                              '<u>первой пары</u>:\n(Время пишется в виде: '
                              'XX:XX, номер пары: число 1-6)',
                              parse_mode='HTML', reply_markup=pairsKb)
-    elif message.text == 'Расписание по другой группе':
+    elif message.text == 'Расписание по группе':
         await message.answer('Укажите группу:', reply_markup=groupKb)
-    elif message.text == 'Расписание по моей группе':
-        group = DB.getUser(message.from_user.id)[5]
-        if group == 'Не указана':
-            await sendErr(message, state, 'Вы не указывали свою группу!')
-        else:
-            async with state.proxy() as data:
-                await getUniSchedule(message, data['date'], group)
-            await state.finish()
     elif message.text == 'Другая':
         await message.answer('Укажите группу в виде "XXXX-XX-XX":')
     elif match(r'[А-Я]{4}-\d\d-\d\d', message.text):
