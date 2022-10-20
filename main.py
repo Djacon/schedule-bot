@@ -39,6 +39,11 @@ def today():
     return datetime.now(pytz.timezone('Europe/Moscow')).date()
 
 
+def getUser(message: Message) -> list:
+    usr = DB.getUser(message.from_user.id)
+    return [*getStationsCodes(usr[0], usr[1]), *usr[2:-1]]
+
+
 async def sendErr(message: Message, state, msg: str = 'Некорректный ввод!'):
     await state.finish()
     await message.answer(msg, reply_markup=mainKb)
@@ -57,7 +62,7 @@ async def getSettings(message: Message):
 
 
 # Admin panel (info)
-@dp.message_handler(commands=['info'])
+@dp.message_handler(commands='info')
 async def info(message: Message):
     if not isAdmin(message):
         await message.answer('Извините, команда доступна только админу!')
@@ -69,7 +74,7 @@ async def info(message: Message):
 
 
 # Admin panel (clear)
-@dp.message_handler(commands=['clear'])
+@dp.message_handler(commands='clear')
 async def clear(message: Message):
     if not isAdmin(message):
         await message.answer('Извините, команда доступна только админу!')
@@ -78,7 +83,7 @@ async def clear(message: Message):
     await message.answer('Сохраненные расписания успешно удалены!')
 
 
-@dp.message_handler(commands=['start'])
+@dp.message_handler(commands='start')
 async def start(message: Message):
     user = message.from_user.first_name
     greet = f'Привет {user}!\nЗдесь ты можешь легко работать с расписанием ' +\
@@ -87,7 +92,7 @@ async def start(message: Message):
     await message.answer(greet, reply_markup=mainKb)
 
 
-@dp.message_handler(commands=['today'])
+@dp.message_handler(commands='today')
 async def todayS(message: Message):
     group = DB.getUser(message.from_user.id)[5]
     if group == 'Не указана':
@@ -95,12 +100,28 @@ async def todayS(message: Message):
     await getUniSchedule(message, str(today()), group)
 
 
-@dp.message_handler(commands=['tomorrow'])
+@dp.message_handler(commands='tomorrow')
 async def tmmrwS(message: Message):
     group = DB.getUser(message.from_user.id)[5]
     if group == 'Не указана':
         return await message.answer('Вы не указывали свою группу!')
     await getUniSchedule(message, str(today() + timedelta(days=1)), group)
+
+
+@dp.message_handler(commands='now')
+async def nowS(message: Message):
+    date = datetime.now(pytz.timezone('Europe/Moscow'))
+    user = getUser(message)
+    time = toMinutes([date.hour, date.minute]) - user[3] - 10
+    date = str(today())
+    await message.answer(f"Расписание на {'.'.join(date.split('-')[::-1])}",
+                         reply_markup=mainKb)
+    try:
+        schedule, size = getScheduleBack(user, time, date)
+        markup = getPaginator(size, time, date, user, 'B')
+        await message.answer(schedule, reply_markup=markup)
+    except KeyError:
+        await message.answer('Ошибка вывода расписания :(')
 
 
 @dp.callback_query_handler(lambda c: c.data.startswith('scheduleF'))
@@ -335,8 +356,7 @@ async def getSchedule(message: Message, date: str, startTime: int,
                       endTime: int):
     await message.answer(f"Расписание на {'.'.join(date.split('-')[::-1])}",
                          reply_markup=mainKb)
-    usr = DB.getUser(message.from_user.id)
-    user = [*getStationsCodes(usr[0], usr[1]), *usr[2:-1]]
+    user = getUser(message)
     try:
         schedule, size = getScheduleForth(user, startTime, date)
         markup = getPaginator(size, startTime, date, user, 'F')
