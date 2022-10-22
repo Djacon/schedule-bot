@@ -112,18 +112,17 @@ async def tmmrwS(message: Message):
 async def nowS(message: Message):
     date = datetime.now(pytz.timezone('Europe/Moscow'))
     user = getUser(message)
-    time = toMinutes([date.hour, date.minute]) - user[3] - 5
+    time = toMinutes([date.hour, date.minute]) - 5
     date = str(today())
     await message.answer(f"Расписание на {'.'.join(date.split('-')[::-1])}",
                          reply_markup=mainKb)
     try:
-        schedule, size = getScheduleNow([*user[:2][::-1], *user[2:]], time,
-                                        date, 1, 'Туда')
-        markup = getPaginator(size, time, date, user, 'B')
+        schedule, size = getScheduleNow(user, time, date)
+        markup = getPaginator(size, time, date, user, 'N')
         await message.answer(schedule, reply_markup=markup)
 
-        schedule, size = getScheduleBack(user, time, date)
-        markup = getPaginator(size, time, date, user, 'B')
+        schedule, size = getScheduleBack(user, time - user[3], date)
+        markup = getPaginator(size, time - user[3], date, user, 'B')
         await message.answer(schedule, reply_markup=markup)
     except KeyError:
         await message.answer('Ошибка вывода расписания :(')
@@ -143,6 +142,15 @@ async def scheduleB_page_callback(call):
     page, time, date, *user = parsePageData(call)
     schedule, size = getScheduleBack(user, time, date, page)
     markup = getPaginator(size, time, date, user, 'B', page)
+    await bot.answer_callback_query(call.id)
+    await editMessage(schedule, call.message, markup)
+
+
+@dp.callback_query_handler(lambda c: c.data.startswith('scheduleN'))
+async def scheduleN_page_callback(call):
+    page, time, date, *user = parsePageData(call)
+    schedule, size = getScheduleNow(user, time, date, page)
+    markup = getPaginator(size, time, date, user, 'N', page)
     await bot.answer_callback_query(call.id)
     await editMessage(schedule, call.message, markup)
 
