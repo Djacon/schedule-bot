@@ -99,13 +99,18 @@ def getScheduleForth(user: list, startTime: int, date: str,
 
 def getScheduleBack(user: list, endTime: int, date: str,
                     page: int = 1) -> tuple:
+    return getScheduleNow(user, endTime, date, page)
+
+
+def getScheduleNow(user: list, endTime: int, date: str,
+                   page: int = 1, dir: str = 'Обратно') -> tuple:
     homeS, workS, homeT, workT, count = user
     back = getInfo(workS, homeS, date)
     back = [x for x in back if toMinutes(x[0]) - workT >= endTime]
     size = ceil(len(back) / count)
     back = back[count * (page-1): count * page]
 
-    schedule = 'Обратно:\nВремя выхода - посадки\n\n'
+    schedule = f'{dir}:\nВремя выхода - посадки\n\n'
     for i, x in enumerate(back):
         schedule += getLine(i, page, *x, workT, homeT, count)
     return schedule, size

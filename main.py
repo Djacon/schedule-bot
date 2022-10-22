@@ -112,11 +112,16 @@ async def tmmrwS(message: Message):
 async def nowS(message: Message):
     date = datetime.now(pytz.timezone('Europe/Moscow'))
     user = getUser(message)
-    time = toMinutes([date.hour, date.minute]) - user[3] - 10
+    time = toMinutes([date.hour, date.minute]) - user[3] - 5
     date = str(today())
     await message.answer(f"Расписание на {'.'.join(date.split('-')[::-1])}",
                          reply_markup=mainKb)
     try:
+        schedule, size = getScheduleNow([*user[:2][::-1], *user[2:]], time,
+                                        date, 1, 'Туда')
+        markup = getPaginator(size, time, date, user, 'B')
+        await message.answer(schedule, reply_markup=markup)
+
         schedule, size = getScheduleBack(user, time, date)
         markup = getPaginator(size, time, date, user, 'B')
         await message.answer(schedule, reply_markup=markup)
