@@ -318,8 +318,6 @@ async def getUniSchedule(message: Message, date: str, group: str):
     weekday = str(datetime.weekday() + 1)
     pairs = fetchUni(group, weekday)
 
-    print(week, 'неделя')
-
     if not len(pairs):
         await message.answer('Ведутся временные работы в mirea.api\n'
                              'Пожалуйста, воспользуйтесь ручным режимом',
