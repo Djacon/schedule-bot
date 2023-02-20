@@ -278,7 +278,7 @@ async def scheduleDay(message: Message, state):
     elif message.text == 'Завтра':
         date = today() + timedelta(days=1)
     elif match(r'^\d\d\.\d\d$', message.text):
-        date = '2022-' + '-'.join(message.text.split('.')[::-1])
+        date = f'{today().year}-' + '-'.join(message.text.split('.')[::-1])
     elif message.text == 'Другой день':
         return await message.answer('Укажите день в виде "dd.mm":')
     else:
@@ -314,9 +314,11 @@ async def manualOrNot(message: Message, state):
 
 async def getUniSchedule(message: Message, date: str, group: str):
     datetime = DATE(*map(int, date.split('-')))
-    week = (datetime - DATE(2022, 8, 29)).days // 7 + 1
+    week = (datetime - DATE(2023, 2, 5)).days // 7 + 1
     weekday = str(datetime.weekday() + 1)
     pairs = fetchUni(group, weekday)
+
+    print(week, 'неделя')
 
     if not len(pairs):
         await message.answer('Ведутся временные работы в mirea.api\n'
