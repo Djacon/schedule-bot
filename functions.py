@@ -9,6 +9,8 @@ TEMP = {}
 KEY = environ['KEY']
 TOKEN = environ['TOKEN']
 
+ADMIN_IDS = [915782472]
+
 
 def toValidTime(x: str) -> list:
     return x[x.find('T') + 1: x.find('+')].split(':')[:2]
@@ -166,4 +168,4 @@ def getStationsCodes(forth: str, back: str) -> tuple:
 
 
 def isAdmin(message) -> bool:
-    return message.from_user.id in [915782472]
+    return message.from_user.id in ADMIN_IDS

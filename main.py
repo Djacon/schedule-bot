@@ -84,7 +84,7 @@ async def clear(message: Message):
 
 
 @dp.message_handler(commands='start')
-async def start(message: Message):
+async def greet(message: Message):
     user = message.from_user.first_name
     greet = f'Привет {user}!\nЗдесь ты можешь легко работать с расписанием ' +\
             'электричек.\n\nПожалуйста, выбери один из этих вариантов, ' +\
@@ -337,6 +337,8 @@ async def getUniSchedule(message: Message, date: str, group: str):
 async def firstPair(message: Message, state):
     if match(r'^[1-6]$', message.text):
         startTime = startIdxToMinutes(message.text)
+    elif message.text == '❎':
+        startTime = -1
     elif match(r'^(0?\d|1\d|2[0-3]):([0-5]\d)$', message.text):
         startTime = toMinutes(message.text.split(':'))
     else:
@@ -355,6 +357,8 @@ async def firstPair(message: Message, state):
 async def lastPair(message: Message, state):
     if match(r'^[1-6]$', message.text):
         endTime = endIdxToMinutes(message.text)
+    elif message.text == '❎':
+        endTime = -1
     elif match(r'^(0?\d|1\d|2[0-3]):([0-5]\d)$', message.text):
         endTime = toMinutes(message.text.split(':'))
     else:
@@ -367,20 +371,31 @@ async def lastPair(message: Message, state):
 
 async def getSchedule(message: Message, date: str, startTime: int,
                       endTime: int):
+    if startTime == endTime == -1:
+        return await message.answer('Расписание не выбрано!',
+                                    reply_markup=mainKb)
     await message.answer(f"Расписание на {'.'.join(date.split('-')[::-1])}",
                          reply_markup=mainKb)
     user = getUser(message)
     try:
-        schedule, size = getScheduleForth(user, startTime, date)
-        markup = getPaginator(size, startTime, date, user, 'F')
-        await message.answer(schedule, reply_markup=markup)
+        if startTime != -1:
+            schedule, size = getScheduleForth(user, startTime, date)
+            markup = getPaginator(size, startTime, date, user, 'F')
+            await message.answer(schedule, reply_markup=markup)
 
-        schedule, size = getScheduleBack(user, endTime, date)
-        markup = getPaginator(size, endTime, date, user, 'B')
-        await message.answer(schedule, reply_markup=markup)
+        if endTime != -1:
+            schedule, size = getScheduleBack(user, endTime, date)
+            markup = getPaginator(size, endTime, date, user, 'B')
+            await message.answer(schedule, reply_markup=markup)
     except KeyError:
         await message.answer('Ошибка вывода расписания :(')
 
 
+# Сообщение об успешном запуске бота
+async def on_startup(_):
+    for ADMIN_ID in ADMIN_IDS:
+        await bot.send_message(ADMIN_ID, 'Бот перезапущен!')
+
+
 if __name__ == '__main__':
-    executor.start_polling(dp, skip_updates=True)
+    executor.start_polling(dp, skip_updates=True, on_startup=on_startup)

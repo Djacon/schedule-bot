@@ -42,8 +42,9 @@ def getGearboxKb():
 
 
 def getPairsKb():
-    markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=6)
-    return markup.add(*[KeyboardButton(str(i)) for i in range(1, 7)])
+    keys = '123456❎'
+    markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=7)
+    return markup.add(*[KeyboardButton(str(i)) for i in keys])
 
 
 def getGroupsKb():
