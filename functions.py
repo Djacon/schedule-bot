@@ -41,7 +41,7 @@ def endIdxToMinutes(idx: int) -> int:
 
 
 def fetch(from_: str, to_: str, date: str) -> list:
-    url = f'https://api.rasp.yandex.net/v3.0/search/?apikey={KEY}' +\
+    url = f'https://api.rasp.yandex.net/v3.0/search/?apikey={KEY}'\
           f'&format=json&from={from_}&to={to_}&lang=ru_RU&page=1&date={date}'
 
     res = rget(url)
@@ -92,11 +92,11 @@ def getScheduleForth(user: list, startTime: int, date: str,
     size = ceil(len(forth) / count)
     forth = forth[count * (page-1): count * page]
 
-    schedule = 'Туда:\nВремя выхода - посадки\n\n'
+    schedule = ['Туда:\nВремя выхода - посадки\n\n']
     for i, x in enumerate(forth):
         mark = '❌✅'[isOnTime(x[0], startTime, x[2], workT)]
-        schedule += f'{mark} ' + getLine(i, page, *x, homeT, workT, count)
-    return schedule, size
+        schedule.append(f"{mark} {getLine(i, page, *x, homeT, workT, count)}")
+    return ''.join(schedule), size
 
 
 def getScheduleBack(user: list, endTime: int, date: str,
@@ -107,10 +107,10 @@ def getScheduleBack(user: list, endTime: int, date: str,
     size = ceil(len(back) / count)
     back = back[count * (page-1): count * page]
 
-    schedule = f'Обратно:\nВремя выхода - посадки\n\n'
+    schedule = [f'Обратно:\nВремя выхода - посадки\n\n']
     for i, x in enumerate(back):
-        schedule += getLine(i, page, *x, workT, homeT, count)
-    return schedule, size
+        schedule.append(getLine(i, page, *x, workT, homeT, count))
+    return ''.join(schedule), size
 
 
 def getScheduleNow(user: list, endTime: int, date: str,
@@ -121,10 +121,10 @@ def getScheduleNow(user: list, endTime: int, date: str,
     size = ceil(len(back) / count)
     back = back[count * (page-1): count * page]
 
-    schedule = f'Туда:\nВремя выхода - посадки\n\n'
+    schedule = [f'Туда:\nВремя выхода - посадки\n\n']
     for i, x in enumerate(back):
-        schedule += getLine(i, page, *x, homeT, workT, count)
-    return schedule, size
+        schedule.append(getLine(i, page, *x, homeT, workT, count))
+    return ''.join(schedule), size
 
 
 def parsePageData(call) -> tuple:
